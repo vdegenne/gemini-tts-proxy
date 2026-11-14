@@ -6,6 +6,7 @@ import { type HttpBindings, serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
+import { ApiError } from '@google/genai'
 import { AccessError, resolveApiKey } from './access.js'
 import { isFirebaseConfigured, isFirebaseInitialized } from './auth.js'
 import { getCacheSnapshot, getSpeech } from './cache.js'
@@ -163,7 +164,15 @@ app.get('/v1/audio/speech', async (c) => {
 		})
 	} catch (error) {
 		console.error('Speech synthesis failed:', error)
-		return c.json({ error: 'Speech synthesis failed' }, 502)
+
+		if (error instanceof ApiError) {
+			const status =
+				error.status >= 400 && error.status <= 599 ? error.status : 502
+
+			return c.json({ error: error.message }, status as 400)
+		}
+
+		return c.json({ error: 'Internal server error' }, 500)
 	}
 })
 
