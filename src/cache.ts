@@ -20,6 +20,12 @@ interface MemoryEntry {
 	data: Buffer
 }
 
+interface PcmFormat {
+	sampleRate: number
+	bitsPerSample: number
+	channels: number
+}
+
 const memoryCache = new Map<string, MemoryEntry>()
 const inFlight = new Map<string, Promise<void>>()
 
@@ -113,73 +119,133 @@ async function synthesize(options: SpeechOptions, hash: string): Promise<void> {
 			},
 		})
 
-		const response = await ai.models.generateContentStream({
-			model: options.model,
-			contents: [
-				{
-					role: 'user',
-					parts: [{ text: options.input }],
+		const chunks: Buffer[] = []
+		let pcmFormat: PcmFormat | undefined
+
+		function addPcmChunk(
+			data: string,
+			mimeType: string,
+			sampleRate?: number,
+			channels?: number,
+		): void {
+			const match = mimeType.match(/^audio\/L(\d+)(?:;rate=(\d+))?/i)
+
+			if (!match) {
+				throw new Error(`Unsupported Gemini audio format: ${mimeType}`)
+			}
+
+			const format: PcmFormat = {
+				bitsPerSample: Number(match[1]),
+				sampleRate: sampleRate ?? Number(match[2] ?? 24000),
+				channels: channels ?? 1,
+			}
+
+			if (format.bitsPerSample !== 16) {
+				throw new Error(`Unsupported PCM bit depth: ${format.bitsPerSample}`)
+			}
+
+			if (pcmFormat) {
+				if (
+					pcmFormat.sampleRate !== format.sampleRate ||
+					pcmFormat.bitsPerSample !== format.bitsPerSample ||
+					pcmFormat.channels !== format.channels
+				) {
+					throw new Error('Gemini returned inconsistent audio formats')
+				}
+			} else {
+				pcmFormat = format
+			}
+
+			chunks.push(Buffer.from(data, 'base64'))
+		}
+
+		if (options.model.startsWith('gemini-3.8-')) {
+			const response = await ai.interactions.create({
+				model: options.model,
+				input: [
+					{
+						type: 'user_input',
+						content: [
+							{
+								type: 'text',
+								text: options.input,
+								annotations: options.systemInstruction
+									? [
+											{
+												type: 'speech_metadata',
+												style: options.systemInstruction,
+											},
+										]
+									: undefined,
+							},
+						],
+					},
+				],
+				response_format: {
+					type: 'audio',
+					mime_type: 'audio/l16',
+					sample_rate: 24000,
 				},
-			],
-			config: {
-				responseModalities: ['AUDIO'],
-				systemInstruction: options.systemInstruction,
-				speechConfig: {
-					languageCode: options.languageCode,
-					voiceConfig: {
-						voice: options.voice,
+				generation_config: {
+					speech_config: [
+						{
+							voice: options.voice,
+						},
+					],
+				},
+				stream: true,
+			})
+
+			for await (const event of response) {
+				if (event.event_type !== 'step.delta') continue
+
+				const delta = event.delta
+
+				if (delta.type !== 'audio' || !delta.data) continue
+
+				addPcmChunk(
+					delta.data,
+					delta.mime_type ?? 'audio/l16',
+					delta.sample_rate ?? 24000,
+					delta.channels ?? 1,
+				)
+			}
+		} else {
+			const response = await ai.models.generateContentStream({
+				model: options.model,
+				contents: [
+					{
+						role: 'user',
+						parts: [
+							{
+								text: options.systemInstruction
+									? `${options.systemInstruction}\n\n${options.input}`
+									: options.input,
+							},
+						],
+					},
+				],
+				config: {
+					responseModalities: ['AUDIO'],
+					speechConfig: {
+						languageCode: options.languageCode,
+						voiceConfig: {
+							voice: options.voice,
+						},
 					},
 				},
-			},
-		})
+			})
 
-		const chunks: Buffer[] = []
-		let pcmFormat:
-			| {
-					sampleRate: number
-					bitsPerSample: number
-					channels: number
-			  }
-			| undefined
+			for await (const chunk of response) {
+				const parts = chunk.candidates?.[0]?.content?.parts ?? []
 
-		for await (const chunk of response) {
-			const parts = chunk.candidates?.[0]?.content?.parts ?? []
+				for (const part of parts) {
+					const inlineData = part.inlineData
 
-			for (const part of parts) {
-				const inlineData = part.inlineData
+					if (!inlineData?.data) continue
 
-				if (!inlineData?.data) continue
-
-				const mimeType = inlineData.mimeType ?? ''
-				const match = mimeType.match(/^audio\/L(\d+)(?:;rate=(\d+))?/i)
-
-				if (!match) {
-					throw new Error(`Unsupported Gemini audio format: ${mimeType}`)
+					addPcmChunk(inlineData.data, inlineData.mimeType ?? '')
 				}
-
-				const format = {
-					bitsPerSample: Number(match[1]),
-					sampleRate: Number(match[2] ?? 24000),
-					channels: 1,
-				}
-
-				if (format.bitsPerSample !== 16) {
-					throw new Error(`Unsupported PCM bit depth: ${format.bitsPerSample}`)
-				}
-
-				if (pcmFormat) {
-					if (
-						pcmFormat.sampleRate !== format.sampleRate ||
-						pcmFormat.bitsPerSample !== format.bitsPerSample ||
-						pcmFormat.channels !== format.channels
-					) {
-						throw new Error('Gemini returned inconsistent audio formats')
-					}
-				} else {
-					pcmFormat = format
-				}
-
-				chunks.push(Buffer.from(inlineData.data, 'base64'))
 			}
 		}
 

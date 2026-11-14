@@ -191,7 +191,10 @@ app.get('/v1/audio/speech', async (c) => {
 			},
 		})
 	} catch (error) {
-		console.error('Speech synthesis failed:', error)
+		console.error(
+			'Speech synthesis failed:',
+			error instanceof ApiError ? getApiErrorMessage(error) : error,
+		)
 
 		if (error instanceof ApiError) {
 			const status =
