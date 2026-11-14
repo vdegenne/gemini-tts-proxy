@@ -360,7 +360,9 @@ console.log(`
 # FFmpeg:            ${ffmpegInfo.version}
 #
 # Gemini API key:    ${apiKeyLoaded ? 'Loaded' : 'Missing'}
-# Service account:   ${serviceAccountFound ? 'File found' : 'Missing'}
+# Service account:   ${
+	serviceAccountFound ? 'File found' : '\x1B[31mMissing\x1B[0m'
+}
 # Firebase Admin:    Lazy initialization
 ##################################################
 `)
