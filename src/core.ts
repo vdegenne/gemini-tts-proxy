@@ -43,7 +43,7 @@ export const GEMINI_TTS_VOICES = [
 
 export type GeminiTtsVoice = (typeof GEMINI_TTS_VOICES)[number]
 
-export interface SpeechOptions {
+export interface GeminiSpeechOptions {
 	input: string
 	model: GeminiTtsModel
 	voice: string
@@ -52,7 +52,9 @@ export interface SpeechOptions {
 	apiKey?: string
 }
 
-export async function getCacheKey(options: SpeechOptions): Promise<string> {
+export async function getCacheKey(
+	options: GeminiSpeechOptions,
+): Promise<string> {
 	const payload = JSON.stringify([
 		options.input,
 		options.model,

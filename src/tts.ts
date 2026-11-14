@@ -1,6 +1,10 @@
 import { ReactiveController, state } from '@snar/lit'
 
-import { getCacheKey, type GeminiTtsVoice, type SpeechOptions } from './core.js'
+import {
+	getCacheKey,
+	type GeminiSpeechOptions,
+	type GeminiTtsVoice,
+} from './core.js'
 
 export type ConnectionState =
 	'disconnected' | 'connecting' | 'connection_error' | 'connected'
@@ -63,7 +67,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 		this.state = 'disconnected'
 	}
 
-	async getAudio(options: SpeechOptions): Promise<AudioRequest> {
+	async getAudio(options: GeminiSpeechOptions): Promise<AudioRequest> {
 		if (this.state !== 'connected') {
 			throw new Error('Gemini TTS is not connected')
 		}
@@ -99,7 +103,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 		}
 	}
 
-	protected async fetchAudio(options: SpeechOptions): Promise<Blob> {
+	protected async fetchAudio(options: GeminiSpeechOptions): Promise<Blob> {
 		const params = new URLSearchParams({
 			input: options.input,
 			model: options.model,
