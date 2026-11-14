@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 
 import { type HttpBindings, serve } from '@hono/node-server'
@@ -308,10 +309,15 @@ const server = serve({
 const serviceAccountFound = isFirebaseConfigured()
 const apiKeyLoaded = Boolean(config.apiKey)
 
+const { version } = JSON.parse(
+	readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as { version: string }
+
 console.log(`
 ##################################################
 #               Gemini TTS Proxy                 #
 ##################################################
+# Version:           ${version}
 # Server:            http://${config.host}:${config.port}
 # Cache:             ${config.cacheDir}
 # FFmpeg:            ${ffmpegInfo.version}
