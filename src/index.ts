@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { serve } from '@hono/node-server'
+import { Readable } from 'node:stream'
+
+import { type HttpBindings, serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { Readable } from 'node:stream'
 
 import { AccessError, resolveApiKey } from './access.js'
 import { getSpeech } from './cache.js'
@@ -28,7 +29,31 @@ try {
 	process.exit(1)
 }
 
-const app = new Hono()
+const app = new Hono<{ Bindings: HttpBindings }>()
+
+const rateLimits = new Map<string, number[]>()
+
+const RATE_LIMIT_MAX = 10
+const RATE_LIMIT_WINDOW = 60_000
+
+function checkRateLimit(ip: string): boolean {
+	const now = Date.now()
+	const timestamps = rateLimits.get(ip) ?? []
+
+	const recentTimestamps = timestamps.filter(
+		(timestamp) => now - timestamp < RATE_LIMIT_WINDOW,
+	)
+
+	if (recentTimestamps.length >= RATE_LIMIT_MAX) {
+		rateLimits.set(ip, recentTimestamps)
+		return false
+	}
+
+	recentTimestamps.push(now)
+	rateLimits.set(ip, recentTimestamps)
+
+	return true
+}
 
 app.use(
 	'*',
@@ -101,6 +126,15 @@ app.get('/v1/audio/speech', async (c) => {
 		}
 
 		throw error
+	}
+
+	const ip =
+		c.req.header('CF-Connecting-IP') ??
+		c.env.incoming.socket.remoteAddress ??
+		'unknown'
+
+	if (!checkRateLimit(ip)) {
+		return c.json({ error: 'Rate limit exceeded. Try again later.' }, 429)
 	}
 
 	try {

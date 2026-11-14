@@ -1,10 +1,10 @@
-import {existsSync, readFileSync} from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
-import type {ServiceAccount} from 'firebase-admin/app'
-import {cert, getApps, initializeApp} from 'firebase-admin/app'
-import {getAuth, type Auth} from 'firebase-admin/auth'
+import type { ServiceAccount } from 'firebase-admin/app'
+import { cert, getApps, initializeApp } from 'firebase-admin/app'
+import { getAuth, type Auth } from 'firebase-admin/auth'
 
-import {config} from './config.js'
+import { config } from './config.js'
 
 let auth: Auth | undefined
 
