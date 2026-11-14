@@ -99,3 +99,30 @@ export async function closeStats(): Promise<void> {
 
 	await flushStats()
 }
+
+export async function getStatsSnapshot() {
+	const stats = await readStats()
+
+	const persistedRequests = Object.values(stats).reduce(function (
+		total,
+		count,
+	) {
+		return total + count
+	}, 0)
+
+	const pendingRequests = Object.values(pending).reduce(function (
+		total,
+		count,
+	) {
+		return total + count
+	}, 0)
+
+	return {
+		trackedAudio: new Set([...Object.keys(stats), ...Object.keys(pending)])
+			.size,
+		totalRequests: persistedRequests + pendingRequests,
+		pendingAudio: Object.keys(pending).length,
+		pendingRequests,
+		isFlushing: Boolean(flushPromise),
+	}
+}

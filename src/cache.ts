@@ -260,3 +260,14 @@ export async function getSpeech(options: SpeechOptions): Promise<CachedAudio> {
 	recordUsage(hash)
 	return result
 }
+
+export function getCacheSnapshot() {
+	return {
+		memory: {
+			entries: memoryCache.size,
+			sizeBytes: memoryCacheSize,
+			maxSizeBytes: config.memoryCacheMaxBytes,
+			inFlight: inFlight.size,
+		},
+	}
+}

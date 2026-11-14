@@ -1,4 +1,4 @@
-import {resolve} from 'node:path'
+import { resolve } from 'node:path'
 
 function getPositiveInteger(name: string, fallback: number): number {
 	const value = process.env[name]
@@ -31,4 +31,6 @@ export const config = {
 	memoryCacheMaxBytes: getPositiveInteger('MEMORY_CACHE_MAX_BYTES', 100 * mib),
 
 	statsFlushIntervalMs: getPositiveInteger('STATS_FLUSH_INTERVAL_MS', 30_000),
+
+	debugToken: process.env.DEBUG_TOKEN,
 } as const

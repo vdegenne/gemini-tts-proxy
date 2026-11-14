@@ -6,7 +6,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
 import { AccessError, resolveApiKey } from './access.js'
-import { getSpeech } from './cache.js'
+import { isFirebaseConfigured, isFirebaseInitialized } from './auth.js'
+import { getCacheSnapshot, getSpeech } from './cache.js'
 import { config } from './config.js'
 import {
 	GEMINI_TTS_MODELS,
@@ -14,7 +15,7 @@ import {
 	type GeminiTtsModel,
 } from './core.js'
 import { checkFFmpeg } from './ffmpeg.js'
-import { closeStats } from './stats.js'
+import { closeStats, getStatsSnapshot } from './stats.js'
 
 let ffmpegInfo: Awaited<ReturnType<typeof checkFFmpeg>>
 
@@ -251,19 +252,73 @@ app.post('/v1/audio/speech', async (c) => {
 	// }
 })
 
+app.get('/debug', async (c) => {
+	if (!config.debugToken) {
+		return c.notFound()
+	}
+
+	if (c.req.header('x-debug-token') !== config.debugToken) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
+	const now = Date.now()
+
+	const clients = Array.from(rateLimits.entries())
+		.map(function ([ip, timestamps]) {
+			const recent = timestamps.filter(
+				(timestamp) => now - timestamp < RATE_LIMIT_WINDOW,
+			)
+
+			return {
+				ip,
+				requestCount: recent.length,
+				remaining: Math.max(0, RATE_LIMIT_MAX - recent.length),
+			}
+		})
+		.filter(function (client) {
+			return client.requestCount > 0
+		})
+
+	return c.json({
+		server: {
+			uptime: process.uptime(),
+			nodeVersion: process.version,
+			memoryUsage: process.memoryUsage(),
+		},
+		rateLimits: {
+			maxRequests: RATE_LIMIT_MAX,
+			windowMs: RATE_LIMIT_WINDOW,
+			clients,
+		},
+		cache: getCacheSnapshot(),
+		stats: await getStatsSnapshot(),
+		firebase: {
+			serviceAccountFound: isFirebaseConfigured(),
+			adminInitialized: isFirebaseInitialized(),
+		},
+	})
+})
+
 const server = serve({
 	fetch: app.fetch,
 	hostname: config.host,
 	port: config.port,
 })
 
+const serviceAccountFound = isFirebaseConfigured()
+const apiKeyLoaded = Boolean(config.apiKey)
+
 console.log(`
 ##################################################
 #               Gemini TTS Proxy                 #
 ##################################################
-# Server:  http://${config.host}:${config.port}
-# Cache:   ${config.cacheDir}
-# FFmpeg:  ${ffmpegInfo.version}
+# Server:            http://${config.host}:${config.port}
+# Cache:             ${config.cacheDir}
+# FFmpeg:            ${ffmpegInfo.version}
+#
+# Gemini API key:    ${apiKeyLoaded ? 'Loaded' : 'Missing'}
+# Service account:   ${serviceAccountFound ? 'File found' : 'Missing'}
+# Firebase Admin:    Lazy initialization
 ##################################################
 `)
 

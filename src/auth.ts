@@ -8,6 +8,10 @@ import { config } from './config.js'
 
 let auth: Auth | undefined
 
+export function isFirebaseInitialized(): boolean {
+	return Boolean(auth)
+}
+
 export function isFirebaseConfigured(): boolean {
 	return existsSync(config.serviceAccountPath)
 }
