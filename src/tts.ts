@@ -17,7 +17,7 @@ export interface AudioRequest {
 	audio: () => Promise<Blob | AudioBuffer>
 }
 
-export class GeminiTtsClient extends ReactiveController {
+export class GeminiTtsProxyClient extends ReactiveController {
 	@state() state: ConnectionState = 'disconnected'
 	@state() voices: GeminiTtsVoiceInfo[] = []
 	@state() endpoint: string
