@@ -32,6 +32,34 @@ try {
 	process.exit(1)
 }
 
+function getApiErrorMessage(error: ApiError): string {
+	try {
+		const response = JSON.parse(error.message) as {
+			error?: { message?: unknown }
+		}
+
+		const nestedMessage = response.error?.message
+
+		if (typeof nestedMessage !== 'string') {
+			return error.message
+		}
+
+		try {
+			const googleError = JSON.parse(nestedMessage) as {
+				error?: { message?: unknown }
+			}
+
+			const message = googleError.error?.message
+
+			return typeof message === 'string' ? message : nestedMessage
+		} catch {
+			return nestedMessage
+		}
+	} catch {
+		return error.message
+	}
+}
+
 const app = new Hono<{ Bindings: HttpBindings }>()
 
 const rateLimits = new Map<string, number[]>()
@@ -169,7 +197,7 @@ app.get('/v1/audio/speech', async (c) => {
 			const status =
 				error.status >= 400 && error.status <= 599 ? error.status : 502
 
-			return c.json({ error: error.message }, status as 400)
+			return c.json({ error: getApiErrorMessage(error) }, status as 400)
 		}
 
 		return c.json({ error: 'Internal server error' }, 500)
