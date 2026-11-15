@@ -4,15 +4,13 @@ import {
 	type GeminiTtsVoice,
 } from './core.js'
 
-export interface GeminiRequestOptions extends GeminiSpeechOptions {}
-
 export interface GeminiAuthHeaders {
 	Authorization?: `Bearer ${string}`
 	'x-goog-api-key'?: string
 }
 
 export interface GeminiFetchOptions {
-	headers?: HeadersInit & GeminiAuthHeaders
+	headers?: Record<string, string> & GeminiAuthHeaders
 }
 
 export interface GeminiTtsVoiceInfo {
@@ -44,7 +42,7 @@ export class GeminiTtsProxyClient {
 	}
 
 	async getAudio(
-		options: GeminiRequestOptions,
+		options: GeminiSpeechOptions,
 		fetchOptions: GeminiFetchOptions = {},
 	): Promise<AudioRequest> {
 		const key = await getCacheKey(options)
@@ -75,7 +73,7 @@ export class GeminiTtsProxyClient {
 	}
 
 	protected async fetchAudio(
-		options: GeminiRequestOptions,
+		options: GeminiSpeechOptions,
 		fetchOptions: GeminiFetchOptions,
 	): Promise<Blob> {
 		const params = new URLSearchParams({
