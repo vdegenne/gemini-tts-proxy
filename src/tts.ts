@@ -4,18 +4,16 @@ import {
 	type GeminiTtsVoice,
 } from './core.js'
 
-export interface GeminiProxyAuth {
+export interface GeminiRequestOptions extends GeminiSpeechOptions {}
+
+export interface GeminiAuthHeaders {
 	Authorization?: `Bearer ${string}`
 	'x-goog-api-key'?: string
 }
 
-export interface GeminiProxyRequestOptions {
-	auth?: GeminiProxyAuth
-	headers?: HeadersInit
+export interface GeminiFetchOptions {
+	headers?: HeadersInit & GeminiAuthHeaders
 }
-
-export interface GeminiRequestOptions
-	extends GeminiSpeechOptions, GeminiProxyRequestOptions {}
 
 export interface GeminiTtsVoiceInfo {
 	id: GeminiTtsVoice
@@ -45,7 +43,10 @@ export class GeminiTtsProxyClient {
 		this.endpoint = endpoint.replace(/\/+$/, '')
 	}
 
-	async getAudio(options: GeminiRequestOptions): Promise<AudioRequest> {
+	async getAudio(
+		options: GeminiRequestOptions,
+		fetchOptions: GeminiFetchOptions = {},
+	): Promise<AudioRequest> {
 		const key = await getCacheKey(options)
 		const cached = this.cache.get(key)
 
@@ -56,7 +57,7 @@ export class GeminiTtsProxyClient {
 			}
 		}
 
-		const audio = this.fetchAudio(options)
+		const audio = this.fetchAudio(options, fetchOptions)
 		this.cache.set(key, audio)
 
 		try {
@@ -73,7 +74,10 @@ export class GeminiTtsProxyClient {
 		}
 	}
 
-	protected async fetchAudio(options: GeminiRequestOptions): Promise<Blob> {
+	protected async fetchAudio(
+		options: GeminiRequestOptions,
+		fetchOptions: GeminiFetchOptions,
+	): Promise<Blob> {
 		const params = new URLSearchParams({
 			input: options.input,
 			model: options.model,
@@ -88,18 +92,8 @@ export class GeminiTtsProxyClient {
 			params.set('systemInstruction', options.systemInstruction)
 		}
 
-		const headers = new Headers(options.headers)
-
-		if (options.auth) {
-			for (const [key, value] of Object.entries(options.auth)) {
-				if (value) {
-					headers.set(key, value)
-				}
-			}
-		}
-
 		const response = await fetch(`${this.endpoint}/v1/audio/speech?${params}`, {
-			headers,
+			headers: new Headers(fetchOptions.headers),
 		})
 
 		if (!response.ok) {
