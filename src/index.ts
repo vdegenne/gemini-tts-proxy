@@ -323,13 +323,14 @@ ${c.cyan}${c.bold}╭───────────────────�
   ${c.dim}STORAGE${c.reset}
   ${c.bold}Cache directory${c.reset}  ${config.cacheDir}
 
-  ${c.dim}CORS ORIGINS (${corsOrigins.length})${c.reset}
+  ${c.dim}CORS ORIGINS (${corsOrigins.length + 1})${c.reset}
+  ${c.green}●${c.reset} http://localhost:*
 ${
 	corsOrigins.length
 		? corsOrigins
 				.map((origin) => `  ${c.green}●${c.reset} ${origin}`)
 				.join('\n')
-		: `  ${c.yellow}No additional origins configured${c.reset}`
+		: `  ${c.red}● No additional origins configured${c.reset}`
 }
 
 ${c.dim}────────────────────────────────────────────────${c.reset}
