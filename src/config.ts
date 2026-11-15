@@ -19,20 +19,29 @@ function getPositiveInteger(name: string, fallback: number): number {
 const mib = 1024 * 1024
 
 export const config = {
+	// Server
 	host: process.env.HOST ?? '127.0.0.1',
 	port: getPositiveInteger('PORT', 3000),
 
+	// Authentication
 	apiKey: process.env.GEMINI_API_KEY,
-
 	serviceAccountPath: resolve(
 		process.env.FIREBASE_SERVICE_ACCOUNT ?? 'serviceAccountKey.json',
 	),
 
+	// Storage
 	cacheDir: resolve(process.env.CACHE_DIR ?? 'data/gemini'),
-
 	memoryCacheMaxBytes: getPositiveInteger('MEMORY_CACHE_MAX_BYTES', 100 * mib),
 
+	// Monitoring
 	statsFlushIntervalMs: getPositiveInteger('STATS_FLUSH_INTERVAL_MS', 30_000),
-
 	debugToken: process.env.DEBUG_TOKEN,
+
+	// Networking
+	corsOrigins:
+		process.env.CORS_ORIGINS?.split(',')
+			.map(function (origin) {
+				return origin.trim()
+			})
+			.filter(Boolean) ?? [],
 } as const

@@ -90,11 +90,13 @@ function checkRateLimit(ip: string): boolean {
 app.use(
 	'*',
 	cors({
-		origin: [
-			'http://localhost:35107',
-			'https://glaizme.web.app',
-			'https://gl-ai-z.win',
-		],
+		origin: function (origin) {
+			if (/^https?:\/\/localhost(?::\d+)?$/.test(origin)) {
+				return origin
+			}
+
+			return config.corsOrigins.includes(origin) ? origin : null
+		},
 		allowMethods: ['GET', 'POST', 'OPTIONS'],
 		allowHeaders: ['Content-Type', 'Authorization', 'x-goog-api-key'],
 	}),
