@@ -46,10 +46,9 @@ export type GeminiTtsVoice = (typeof GEMINI_TTS_VOICES)[number]
 export interface GeminiSpeechOptions {
 	input: string
 	model: GeminiTtsModel
-	voice: string
-	languageCode: string
+	voice: GeminiTtsVoice
+	languageCode?: string
 	systemInstruction?: string
-	apiKey?: string
 }
 
 export async function getCacheKey(
@@ -59,7 +58,7 @@ export async function getCacheKey(
 		options.input,
 		options.model,
 		options.voice,
-		options.languageCode,
+		options.languageCode ?? '',
 		options.systemInstruction ?? '',
 	])
 

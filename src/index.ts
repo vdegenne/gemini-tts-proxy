@@ -2,11 +2,11 @@
 import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 
+import { ApiError } from '@google/genai'
 import { type HttpBindings, serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
-import { ApiError } from '@google/genai'
 import { AccessError, resolveApiKey } from './access.js'
 import { isFirebaseConfigured, isFirebaseInitialized } from './auth.js'
 import { getCacheSnapshot, getSpeech } from './cache.js'
@@ -15,6 +15,7 @@ import {
 	GEMINI_TTS_MODELS,
 	GEMINI_TTS_VOICES,
 	type GeminiTtsModel,
+	type GeminiTtsVoice,
 } from './core.js'
 import { checkFFmpeg } from './ffmpeg.js'
 import { closeStats, getStatsSnapshot } from './stats.js'
@@ -121,15 +122,10 @@ app.get('/v1/audio/speech', async (c) => {
 	const languageCode = c.req.query('languageCode')
 	const systemInstruction = c.req.query('systemInstruction')
 
-	if (
-		!input?.trim() ||
-		!model?.trim() ||
-		!voice?.trim() ||
-		!languageCode?.trim()
-	) {
+	if (!input?.trim() || !model?.trim() || !voice?.trim()) {
 		return c.json(
 			{
-				error: 'input, model, voice and languageCode must be non-empty strings',
+				error: 'input, model and voice must be non-empty strings',
 			},
 			400,
 		)
@@ -140,6 +136,22 @@ app.get('/v1/audio/speech', async (c) => {
 			{
 				error: `Unsupported model. Supported models: ${GEMINI_TTS_MODELS.join(', ')}`,
 			},
+			400,
+		)
+	}
+
+	if (!GEMINI_TTS_VOICES.includes(voice as GeminiTtsVoice)) {
+		return c.json(
+			{
+				error: `Unsupported voice. Supported voices: ${GEMINI_TTS_VOICES.join(', ')}`,
+			},
+			400,
+		)
+	}
+
+	if (languageCode !== undefined && !languageCode.trim()) {
+		return c.json(
+			{ error: 'languageCode must be a non-empty string when provided' },
 			400,
 		)
 	}
@@ -169,14 +181,16 @@ app.get('/v1/audio/speech', async (c) => {
 	}
 
 	try {
-		const audio = await getSpeech({
-			input,
-			model: model as GeminiTtsModel,
-			voice,
-			languageCode,
-			systemInstruction,
+		const audio = await getSpeech(
+			{
+				input,
+				model: model as GeminiTtsModel,
+				voice: voice as GeminiTtsVoice,
+				...(languageCode ? { languageCode } : {}),
+				...(systemInstruction ? { systemInstruction } : {}),
+			},
 			apiKey,
-		})
+		)
 
 		const stream =
 			audio.body instanceof Readable
@@ -209,88 +223,6 @@ app.get('/v1/audio/speech', async (c) => {
 
 app.post('/v1/audio/speech', async (c) => {
 	return c.json({ error: 'POST endpoint temporarily disabled' }, 410)
-	// let body: unknown
-	//
-	// try {
-	// 	body = await c.req.json()
-	// } catch {
-	// 	return c.json({ error: 'Invalid JSON body' }, 400)
-	// }
-	//
-	// if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-	// 	return c.json({ error: 'Expected a JSON object' }, 400)
-	// }
-	//
-	// const input = body as Record<string, unknown>
-	//
-	// if (
-	// 	typeof input.input !== 'string' ||
-	// 	input.input.trim().length === 0 ||
-	// 	typeof input.voice !== 'string' ||
-	// 	input.voice.trim().length === 0
-	// ) {
-	// 	return c.json({ error: 'input and voice must be non-empty strings' }, 400)
-	// }
-	//
-	// const speed = input.speed ?? 1
-	// const volumeMultiplier = input.volume_multiplier ?? 1
-	//
-	// if (
-	// 	typeof speed !== 'number' ||
-	// 	!Number.isFinite(speed) ||
-	// 	speed <= 0 ||
-	// 	typeof volumeMultiplier !== 'number' ||
-	// 	!Number.isFinite(volumeMultiplier) ||
-	// 	volumeMultiplier <= 0
-	// ) {
-	// 	return c.json(
-	// 		{ error: 'speed and volume_multiplier must be positive numbers' },
-	// 		400,
-	// 	)
-	// }
-	//
-	// if (requiresPremium(input.input, input.voice)) {
-	// 	const authorization = c.req.header('Authorization')
-	//
-	// 	if (!authorization?.startsWith('Bearer ')) {
-	// 		return c.json({ error: 'Authentication required' }, 401)
-	// 	}
-	//
-	// 	try {
-	// 		const isPremium = await verifyPremiumUser(authorization.slice(7))
-	//
-	// 		if (!isPremium) {
-	// 			return c.json({ error: 'Premium subscription required' }, 403)
-	// 		}
-	// 	} catch {
-	// 		return c.json({ error: 'Invalid authentication token' }, 401)
-	// 	}
-	// }
-	// try {
-	// 	const audio = await getSpeech({
-	// 		input: input.input,
-	// 		voice: input.voice,
-	// 		speed,
-	// 		volume_multiplier: volumeMultiplier,
-	// 	})
-	//
-	// 	const stream =
-	// 		audio.body instanceof Readable
-	// 			? Readable.toWeb(audio.body)
-	// 			: Readable.toWeb(Readable.from([audio.body]))
-	//
-	// 	return new Response(stream as globalThis.ReadableStream<Uint8Array>, {
-	// 		headers: {
-	// 			'content-type': 'audio/mpeg',
-	// 			'content-length': String(audio.size),
-	// 			'cache-control': 'no-store',
-	// 		},
-	// 	})
-	// } catch (error) {
-	// 	console.error('Speech synthesis failed:', error)
-	//
-	// 	return c.json({ error: 'Speech synthesis failed' }, 502)
-	// }
 })
 
 app.get('/debug', async (c) => {

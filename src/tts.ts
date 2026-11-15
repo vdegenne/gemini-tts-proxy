@@ -78,8 +78,11 @@ export class GeminiTtsProxyClient {
 			input: options.input,
 			model: options.model,
 			voice: options.voice,
-			languageCode: options.languageCode,
 		})
+
+		if (options.languageCode) {
+			params.set('languageCode', options.languageCode)
+		}
 
 		if (options.systemInstruction) {
 			params.set('systemInstruction', options.systemInstruction)

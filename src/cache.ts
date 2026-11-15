@@ -103,12 +103,13 @@ async function getDiskAudio(hash: string): Promise<CachedAudio | undefined> {
 async function synthesize(
 	options: GeminiSpeechOptions,
 	hash: string,
+	apiKey: string,
 ): Promise<void> {
 	const path = getDiskPath(hash)
 	const directory = join(path, '..')
 	const tempPath = `${path}.${randomUUID()}.tmp`
 
-	if (!options.apiKey) {
+	if (!apiKey) {
 		throw new Error('No Gemini API key was provided')
 	}
 
@@ -116,7 +117,7 @@ async function synthesize(
 
 	try {
 		const ai = new GoogleGenAI({
-			apiKey: options.apiKey,
+			apiKey,
 			httpOptions: {
 				apiVersion: 'v1beta',
 			},
@@ -231,7 +232,9 @@ async function synthesize(
 				config: {
 					responseModalities: ['AUDIO'],
 					speechConfig: {
-						languageCode: options.languageCode,
+						...(options.languageCode
+							? { languageCode: options.languageCode }
+							: {}),
 						voiceConfig: {
 							voice: options.voice,
 						},
@@ -276,6 +279,7 @@ async function synthesize(
 
 export async function getSpeech(
 	options: GeminiSpeechOptions,
+	apiKey: string,
 ): Promise<CachedAudio> {
 	const hash = await getCacheKey(options)
 
@@ -296,7 +300,7 @@ export async function getSpeech(
 	let pending = inFlight.get(hash)
 
 	if (!pending) {
-		pending = synthesize(options, hash)
+		pending = synthesize(options, hash, apiKey)
 		inFlight.set(hash, pending)
 
 		void pending.then(
