@@ -18,7 +18,7 @@ type CachedAudio = Blob | Promise<Blob>
 
 export interface AudioRequest {
 	key: string
-	audio: () => Promise<Blob | AudioBuffer>
+	audio: Promise<Blob | AudioBuffer>
 }
 
 export class GeminiTtsProxyClient extends ReactiveController {
@@ -78,9 +78,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 		if (cached) {
 			return {
 				key,
-				audio: function () {
-					return Promise.resolve(cached)
-				},
+				audio: Promise.resolve(cached),
 			}
 		}
 
@@ -93,9 +91,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 
 			return {
 				key,
-				audio: async function () {
-					return blob
-				},
+				audio: Promise.resolve(blob),
 			}
 		} catch (error) {
 			this.cache.delete(key)
