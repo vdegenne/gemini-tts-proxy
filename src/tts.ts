@@ -9,6 +9,10 @@ import {
 export type ConnectionState =
 	'disconnected' | 'connecting' | 'connection_error' | 'connected'
 
+export interface GeminiRequestOptions extends GeminiSpeechOptions {
+	headers?: HeadersInit
+}
+
 export interface GeminiTtsVoiceInfo {
 	id: GeminiTtsVoice
 	name: string
@@ -18,7 +22,7 @@ type CachedAudio = Blob | Promise<Blob>
 
 export interface AudioRequest {
 	key: string
-	audio: Promise<Blob | AudioBuffer>
+	audio: Promise<Blob>
 }
 
 export class GeminiTtsProxyClient extends ReactiveController {
@@ -67,7 +71,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 		this.state = 'disconnected'
 	}
 
-	async getAudio(options: GeminiSpeechOptions): Promise<AudioRequest> {
+	async getAudio(options: GeminiRequestOptions): Promise<AudioRequest> {
 		if (this.state !== 'connected') {
 			throw new Error('Gemini TTS is not connected')
 		}
@@ -99,7 +103,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 		}
 	}
 
-	protected async fetchAudio(options: GeminiSpeechOptions): Promise<Blob> {
+	protected async fetchAudio(options: GeminiRequestOptions): Promise<Blob> {
 		const params = new URLSearchParams({
 			input: options.input,
 			model: options.model,
@@ -111,7 +115,7 @@ export class GeminiTtsProxyClient extends ReactiveController {
 			params.set('systemInstruction', options.systemInstruction)
 		}
 
-		const headers = new Headers()
+		const headers = new Headers(options.headers)
 
 		if (options.apiKey) {
 			headers.set('x-goog-api-key', options.apiKey)
