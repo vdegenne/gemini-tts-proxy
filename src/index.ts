@@ -287,21 +287,52 @@ const { version } = JSON.parse(
 	readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as { version: string }
 
-console.log(`
-##################################################
-#               Gemini TTS Proxy                 #
-##################################################
-# Version:           ${version}
-# Server:            http://${config.host}:${config.port}
-# Cache:             ${config.cacheDir}
-# FFmpeg:            ${ffmpegInfo.version}
-#
-# Gemini API key:    ${apiKeyLoaded ? 'Loaded' : 'Missing'}
-# Service account:   ${
-	serviceAccountFound ? 'File found' : '\x1B[31mMissing\x1B[0m'
+const c = {
+	reset: '\x1B[0m',
+	bold: '\x1B[1m',
+	dim: '\x1B[2m',
+	green: '\x1B[32m',
+	red: '\x1B[31m',
+	cyan: '\x1B[36m',
+	yellow: '\x1B[33m',
 }
-# Firebase Admin:    Lazy initialization
-##################################################
+
+function status(loaded: boolean, success = 'Loaded', failure = 'Missing') {
+	return loaded
+		? `${c.green}● ${success}${c.reset}`
+		: `${c.red}● ${failure}${c.reset}`
+}
+
+const corsOrigins = config.corsOrigins
+
+console.log(`
+${c.cyan}${c.bold}╭──────────────────────────────────────────────╮
+│              GEMINI TTS PROXY                │
+╰──────────────────────────────────────────────╯${c.reset}
+
+  ${c.dim}SERVER${c.reset}
+  ${c.bold}Version${c.reset}          ${version}
+  ${c.bold}Address${c.reset}          http://${config.host}:${config.port}
+
+  ${c.dim}SERVICES${c.reset}
+  ${c.bold}Gemini API key${c.reset}   ${status(apiKeyLoaded)}
+  ${c.bold}Service account${c.reset}  ${status(serviceAccountFound, 'File found')}
+  ${c.bold}Firebase Admin${c.reset}   ${c.yellow}Lazy initialization${c.reset}
+  ${c.bold}FFmpeg${c.reset}           ${ffmpegInfo.version}
+
+  ${c.dim}STORAGE${c.reset}
+  ${c.bold}Cache directory${c.reset}  ${config.cacheDir}
+
+  ${c.dim}CORS ORIGINS (${corsOrigins.length})${c.reset}
+${
+	corsOrigins.length
+		? corsOrigins
+				.map((origin) => `  ${c.green}●${c.reset} ${origin}`)
+				.join('\n')
+		: `  ${c.yellow}No additional origins configured${c.reset}`
+}
+
+${c.dim}────────────────────────────────────────────────${c.reset}
 `)
 
 let shuttingDown = false
