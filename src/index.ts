@@ -280,6 +280,11 @@ const server = serve({
 	port: config.port,
 })
 
+await new Promise<void>(function (resolve, reject) {
+	server.once('listening', resolve)
+	server.once('error', reject)
+})
+
 const serviceAccountFound = isFirebaseConfigured()
 const apiKeyLoaded = Boolean(config.apiKey)
 
