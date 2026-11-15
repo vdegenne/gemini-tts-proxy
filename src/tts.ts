@@ -1,17 +1,21 @@
-import { ReactiveController, state } from '@snar/lit'
-
 import {
 	getCacheKey,
 	type GeminiSpeechOptions,
 	type GeminiTtsVoice,
 } from './core.js'
 
-export type ConnectionState =
-	'disconnected' | 'connecting' | 'connection_error' | 'connected'
+export interface GeminiProxyAuth {
+	Authorization?: `Bearer ${string}`
+	'x-goog-api-key'?: string
+}
 
-export interface GeminiRequestOptions extends GeminiSpeechOptions {
+export interface GeminiProxyRequestOptions {
+	auth?: GeminiProxyAuth
 	headers?: HeadersInit
 }
+
+export interface GeminiRequestOptions
+	extends GeminiSpeechOptions, GeminiProxyRequestOptions {}
 
 export interface GeminiTtsVoiceInfo {
 	id: GeminiTtsVoice
@@ -25,12 +29,12 @@ export interface AudioRequest {
 	audio: Promise<Blob>
 }
 
-export class GeminiTtsProxyClient extends ReactiveController {
-	@state() state: ConnectionState = 'disconnected'
-	@state() voices: GeminiTtsVoiceInfo[] = []
-	@state() endpoint: string
+export class GeminiTtsProxyClient {
+	endpoint: string
 
-	private voicesPromise: Promise<void> | undefined
+	voices: GeminiTtsVoiceInfo[] = []
+
+	// private voicesPromise: Promise<void> | undefined
 	private cache = new Map<string, CachedAudio>()
 
 	constructor({
@@ -38,44 +42,10 @@ export class GeminiTtsProxyClient extends ReactiveController {
 	}: {
 		endpoint?: string
 	} = {}) {
-		super()
 		this.endpoint = endpoint.replace(/\/+$/, '')
 	}
 
-	async connect({ reconnect = false }: { reconnect?: boolean } = {}) {
-		if (this.state === 'connected' && !reconnect) {
-			return
-		}
-
-		this.state = 'connecting'
-
-		try {
-			const response = await fetch(`${this.endpoint}/health`)
-
-			if (!response.ok) {
-				throw new Error(
-					`Gemini TTS health check failed: HTTP ${response.status}`,
-				)
-			}
-
-			this.state = 'connected'
-		} catch (error) {
-			this.state = 'connection_error'
-			throw error
-		}
-	}
-
-	disconnect() {
-		this.voices = []
-		this.voicesPromise = undefined
-		this.state = 'disconnected'
-	}
-
 	async getAudio(options: GeminiRequestOptions): Promise<AudioRequest> {
-		if (this.state !== 'connected') {
-			throw new Error('Gemini TTS is not connected')
-		}
-
 		const key = await getCacheKey(options)
 		const cached = this.cache.get(key)
 
@@ -117,8 +87,12 @@ export class GeminiTtsProxyClient extends ReactiveController {
 
 		const headers = new Headers(options.headers)
 
-		if (options.apiKey) {
-			headers.set('x-goog-api-key', options.apiKey)
+		if (options.auth) {
+			for (const [key, value] of Object.entries(options.auth)) {
+				if (value) {
+					headers.set(key, value)
+				}
+			}
 		}
 
 		const response = await fetch(`${this.endpoint}/v1/audio/speech?${params}`, {
@@ -132,49 +106,41 @@ export class GeminiTtsProxyClient extends ReactiveController {
 		return response.blob()
 	}
 
-	private async fetchVoices(): Promise<void> {
-		if (this.state !== 'connected') {
-			throw new Error('Gemini TTS is not connected')
-		}
+	// private async fetchVoices(): Promise<void> {
+	// 	const response = await fetch(`${this.endpoint}/v1/voices`)
+	//
+	// 	if (!response.ok) {
+	// 		throw new Error(
+	// 			`Gemini TTS voices request failed: HTTP ${response.status}`,
+	// 		)
+	// 	}
+	//
+	// 	const data: { voices: GeminiTtsVoiceInfo[] } = await response.json()
+	// 	this.voices = data.voices
+	// }
 
-		const response = await fetch(`${this.endpoint}/v1/voices`)
+	// private async ensureVoices(): Promise<void> {
+	// 	if (this.voices.length > 0) return
+	//
+	// 	if (!this.voicesPromise) {
+	// 		this.voicesPromise = this.fetchVoices().catch((error) => {
+	// 			this.voicesPromise = undefined
+	// 			throw error
+	// 		})
+	// 	}
+	//
+	// 	await this.voicesPromise
+	// }
 
-		if (!response.ok) {
-			throw new Error(
-				`Gemini TTS voices request failed: HTTP ${response.status}`,
-			)
-		}
-
-		const data: { voices: GeminiTtsVoiceInfo[] } = await response.json()
-		this.voices = data.voices
-	}
-
-	private async ensureVoices(): Promise<void> {
-		if (this.voices.length > 0) return
-
-		if (!this.voicesPromise) {
-			this.voicesPromise = this.fetchVoices().catch((error) => {
-				this.voicesPromise = undefined
-				throw error
-			})
-		}
-
-		await this.voicesPromise
-	}
-
-	async getVoiceTitleFromId(
-		voiceId: GeminiTtsVoice,
-	): Promise<string | undefined> {
-		if (this.state !== 'connected') {
-			throw new Error('Gemini TTS is not connected')
-		}
-
-		await this.ensureVoices()
-
-		const voice = this.voices.find((voice) => voice.id === voiceId)
-
-		if (voice) {
-			return voice.name
-		}
-	}
+	// async getVoiceTitleFromId(
+	// 	voiceId: GeminiTtsVoice,
+	// ): Promise<string | undefined> {
+	// 	await this.ensureVoices()
+	//
+	// 	const voice = this.voices.find((voice) => voice.id === voiceId)
+	//
+	// 	if (voice) {
+	// 		return voice.name
+	// 	}
+	// }
 }
