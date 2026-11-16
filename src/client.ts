@@ -106,14 +106,59 @@ export class GeminiTtsProxyClient {
 			params.set('systemInstruction', options.systemInstruction)
 		}
 
-		const response = await fetch(`${this.endpoint}/v1/audio/speech?${params}`, {
-			headers: new Headers(fetchOptions.headers),
-		})
+		const response = await this.fetch(
+			`${this.endpoint}/v1/audio/speech?${params}`,
+			{
+				headers: new Headers(fetchOptions.headers),
+			},
+		)
 
 		if (!response.ok) {
-			throw new Error(`Gemini TTS synthesis failed: HTTP ${response.status}`)
+			throw await this.createResponseError(
+				response,
+				'Gemini TTS synthesis failed',
+			)
 		}
 
 		return response.blob()
+	}
+
+	// HTTP
+
+	private async fetch(url: string, options?: RequestInit): Promise<Response> {
+		try {
+			return await fetch(url, options)
+		} catch (error) {
+			const path = new URL(url).pathname
+
+			throw new Error(
+				`Gemini TTS request failed for ${path}. Is the proxy running?`,
+				{ cause: error },
+			)
+		}
+	}
+
+	// Errors
+
+	private async createResponseError(
+		response: Response,
+		fallback: string,
+	): Promise<Error> {
+		try {
+			const body: unknown = await response.json()
+
+			if (
+				typeof body === 'object' &&
+				body !== null &&
+				'error' in body &&
+				typeof body.error === 'string'
+			) {
+				return new Error(body.error)
+			}
+		} catch {
+			// The response body is not valid JSON.
+		}
+
+		return new Error(`${fallback}: ${response.status} ${response.statusText}`)
 	}
 }

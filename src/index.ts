@@ -6,6 +6,7 @@ import { ApiError } from '@google/genai'
 import { type HttpBindings, serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { type ContentfulStatusCode } from 'hono/utils/http-status'
 
 import { AccessError, resolveApiKey } from './access.js'
 import { isFirebaseConfigured, isFirebaseInitialized } from './auth.js'
@@ -35,27 +36,41 @@ try {
 
 function getApiErrorMessage(error: ApiError): string {
 	try {
-		const response = JSON.parse(error.message) as {
-			error?: { message?: unknown }
-		}
+		const response: unknown = JSON.parse(error.message)
 
-		const nestedMessage = response.error?.message
-
-		if (typeof nestedMessage !== 'string') {
+		if (
+			typeof response !== 'object' ||
+			response === null ||
+			!('error' in response) ||
+			typeof response.error !== 'object' ||
+			response.error === null ||
+			!('message' in response.error) ||
+			typeof response.error.message !== 'string'
+		) {
 			return error.message
 		}
 
+		const nestedMessage = response.error.message
+
 		try {
-			const googleError = JSON.parse(nestedMessage) as {
-				error?: { message?: unknown }
+			const googleError: unknown = JSON.parse(nestedMessage)
+
+			if (
+				typeof googleError === 'object' &&
+				googleError !== null &&
+				'error' in googleError &&
+				typeof googleError.error === 'object' &&
+				googleError.error !== null &&
+				'message' in googleError.error &&
+				typeof googleError.error.message === 'string'
+			) {
+				return googleError.error.message
 			}
-
-			const message = googleError.error?.message
-
-			return typeof message === 'string' ? message : nestedMessage
 		} catch {
-			return nestedMessage
+			// The nested message is not JSON.
 		}
+
+		return nestedMessage
 	} catch {
 		return error.message
 	}
@@ -168,6 +183,7 @@ app.get('/v1/audio/speech', async (c) => {
 			)
 		}
 	}
+
 	if (systemInstruction !== undefined && !systemInstruction.trim()) {
 		return c.json(
 			{ error: 'systemInstruction must be a non-empty string when provided' },
@@ -233,7 +249,10 @@ app.get('/v1/audio/speech', async (c) => {
 			const status =
 				error.status >= 400 && error.status <= 599 ? error.status : 502
 
-			return c.json({ error: getApiErrorMessage(error) }, status as 400)
+			return c.json(
+				{ error: getApiErrorMessage(error) },
+				status as ContentfulStatusCode,
+			)
 		}
 
 		return c.json({ error: 'Internal server error' }, 500)
