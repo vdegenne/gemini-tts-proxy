@@ -1,45 +1,59 @@
 # @vdegenne/gemini-tts-proxy
 
-A lightweight HTTP proxy for Google's Gemini API.
+A lightweight self-hosted HTTP proxy for Google's Gemini Text-to-Speech API.
 
-It exposes a simple HTTP endpoint to generate speech using Gemini voices and models, with built-in audio caching and optional authentication.
+It provides a simple HTTP endpoint to generate speech using Gemini voices and models, with built-in audio caching, optional Firebase authentication and a browser client.
 
 ## Features
 
 - Gemini Text-to-Speech support.
-- MP3 audio output.
+- MP3 audio output (128 kbps).
 - Multiple Gemini models and voices.
 - Optional language selection (BCP-47).
-- HTTP audio caching (disk and memory).
+- Disk and in-memory audio caching.
+- LRU memory cache.
 - In-flight request deduplication.
 - Optional Firebase authentication and premium access control.
 - Rate limiting.
+- Browser client included.
 
 ## Requirements
 
 - Node.js
-- FFmpeg
+- FFmpeg 4.4 or newer, with `libmp3lame` support.
 - A Google Gemini API key.
 
 ## Installation
 
 ```bash
-npm install
+npm install @vdegenne/gemini-tts-proxy
+```
+
+## Running the server
+
+The package provides a CLI executable:
+
+```bash
+npx gemini-tts-proxy
 ```
 
 ## Configuration
 
-The following environment variables are available:
+Configuration is provided through environment variables (a `.env` file is supported).
 
-| Variable                   | Description                          |
-| -------------------------- | ------------------------------------ |
-| `HOST`                     | Server host                          |
-| `PORT`                     | Server port                          |
-| `GEMINI_API_KEY`           | Google Gemini API key                |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase service account credentials |
-| `CACHE_DIR`                | Audio cache directory                |
-| `MEMORY_CACHE_MAX_BYTES`   | Maximum in-memory cache size         |
-| `DEBUG_TOKEN`              | Optional debug token                 |
+| Variable                   | Default                  | Description                             |
+| -------------------------- | ------------------------ | --------------------------------------- |
+| `HOST`                     | `127.0.0.1`              | Server host                             |
+| `PORT`                     | `3000`                   | Server port                             |
+| `GEMINI_API_KEY`           | —                        | Server-side Gemini API key              |
+| `FIREBASE_SERVICE_ACCOUNT` | `serviceAccountKey.json` | Firebase service account JSON file      |
+| `CACHE_DIR`                | `data/gemini`            | Cache directory                         |
+| `MEMORY_CACHE_MAX_BYTES`   | `104857600`              | Maximum in-memory cache size (100 MiB)  |
+| `STATS_FLUSH_INTERVAL_MS`  | `30000`                  | Usage statistics flush interval         |
+| `DEBUG_TOKEN`              | —                        | Enables the protected debug endpoint    |
+| `CORS_ORIGINS`             | —                        | Comma-separated list of allowed origins |
+
+A Gemini API key can also be supplied directly by the client.
 
 ## API
 
@@ -54,14 +68,20 @@ Generates speech and returns an MP3 audio response.
 | `input`             | Yes      | Text to synthesize             |
 | `model`             | Yes      | Gemini TTS model               |
 | `voice`             | Yes      | Gemini voice name              |
-| `languageCode`      | Yes      | BCP-47 language tag            |
+| `languageCode`      | No       | BCP-47 language tag            |
 | `systemInstruction` | No       | Additional speech instructions |
 
-**Authentication**
+**Supported models**
 
-Pass your Gemini API key using the `x-goog-api-key` header.
+- `gemini-2.5-flash-preview-tts`
+- `gemini-2.5-pro-preview-tts`
+- `gemini-3.1-flash-tts-preview`
+- `gemini-3.8-flash-tts`
+- `gemini-3.8-flash-lite-tts`
 
-If Firebase authentication is configured, a valid Firebase ID token can also be supplied using the `Authorization: Bearer` header. Premium access is enforced when applicable.
+**Supported voices**
+
+Achernar, Achird, Algenib, Algieba, Alnilam, Aoede, Autonoe, Callirrhoe, Charon, Despina, Enceladus, Erinome, Fenrir, Gacrux, Iapetus, Kore, Laomedeia, Leda, Orus, Puck, Pulcherrima, Rasalgethi, Sadachbia, Sadaltager, Schedar, Sulafat, Umbriel, Vindemiatrix, Zephyr and Zubenelgenubi.
 
 **Example**
 
@@ -71,16 +91,92 @@ curl -G "http://localhost:3000/v1/audio/speech" \
   --data-urlencode "input=Hello, world!" \
   --data-urlencode "model=gemini-3.8-flash-lite-tts" \
   --data-urlencode "voice=Kore" \
-  --data-urlencode "languageCode=en-US" \
   --output speech.mp3
 ```
 
+### `GET /v1/voices`
+
+Returns the list of supported voices in JSON format.
+
+### `GET /health`
+
+Returns the server health status.
+
+### `GET /debug`
+
+Returns server diagnostics, cache information, usage statistics, rate limits and Firebase status.
+
+Requires the `x-debug-token` header matching `DEBUG_TOKEN`. Returns 404 when debugging is disabled.
+
+## Authentication
+
+The proxy supports two ways of providing a Gemini API key.
+
+**Client-provided API key**
+
+Pass the key using the `x-goog-api-key` header.
+
+```http
+x-goog-api-key: YOUR_API_KEY
+```
+
+This takes precedence over the server-side key and bypasses Firebase authentication.
+
+**Server-side API key**
+
+Set `GEMINI_API_KEY` in the server environment.
+
+If no Firebase service account is configured, the server key is sufficient.
+
+If a Firebase service account is present, clients must provide a valid Firebase ID token with the `premium` claim set to `true`.
+
+```http
+Authorization: Bearer FIREBASE_ID_TOKEN
+```
+
+The server then uses its own Gemini API key to generate speech.
+
+## Rate limiting
+
+The speech endpoint is limited to 10 requests per minute per client IP address.
+
+Requests exceeding this limit receive HTTP 429.
+
 ## Caching
 
-Generated audio is cached to avoid unnecessary Gemini API requests.
+Generated audio is cached on disk and in memory.
 
-Repeated requests with identical parameters reuse the cached audio. Concurrent identical requests are also deduplicated.
+- Disk caching persists generated audio between server restarts.
+- Memory caching uses an LRU strategy with a configurable size limit.
+- Concurrent identical requests share the same synthesis operation.
+- Cache keys are based on normalized speech parameters, including the model, voice, language and system instruction.
+
+Audio responses include a one-year immutable HTTP cache policy.
+
+## Browser client
+
+The package also exports `GeminiTtsProxyClient`, which can be used in browser applications.
+
+```ts
+import { GeminiTtsProxyClient } from '@vdegenne/gemini-tts-proxy'
+
+const client = new GeminiTtsProxyClient({
+	endpoint: 'http://localhost:3000',
+})
+
+const audio = await client.getAudio({
+	input: 'Hello, world!',
+	model: 'gemini-3.8-flash-lite-tts',
+	voice: 'Kore',
+})
+
+const url = URL.createObjectURL(audio)
+```
+
+The client includes an in-memory cache and deduplicates concurrent identical requests.
+
+Authentication headers can be supplied through the second argument of `getAudio()` or `createAudioRequest()`.
 
 ## License
 
-MIT
+No license has been specified yet.
