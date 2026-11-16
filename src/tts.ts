@@ -80,7 +80,10 @@ export class GeminiTtsProxyClient {
 			this.cache.set(key, blob)
 			return blob
 		} catch (error) {
-			this.cache.delete(key)
+			if (this.cache.get(key) === promise) {
+				this.cache.delete(key)
+			}
+
 			throw error
 		}
 	}

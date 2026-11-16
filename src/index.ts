@@ -151,9 +151,26 @@ app.get('/v1/audio/speech', async (c) => {
 		)
 	}
 
-	if (languageCode !== undefined && !languageCode.trim()) {
+	if (languageCode !== undefined) {
+		try {
+			if (!languageCode.trim()) {
+				throw new Error()
+			}
+
+			Intl.getCanonicalLocales(languageCode)
+		} catch {
+			return c.json(
+				{
+					error:
+						'languageCode must be a valid BCP-47 language tag when provided',
+				},
+				400,
+			)
+		}
+	}
+	if (systemInstruction !== undefined && !systemInstruction.trim()) {
 		return c.json(
-			{ error: 'languageCode must be a non-empty string when provided' },
+			{ error: 'systemInstruction must be a non-empty string when provided' },
 			400,
 		)
 	}

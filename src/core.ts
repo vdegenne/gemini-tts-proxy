@@ -51,16 +51,25 @@ export interface GeminiSpeechOptions {
 	systemInstruction?: string
 }
 
+export function normalizeSpeechOptions(
+	options: GeminiSpeechOptions,
+): GeminiSpeechOptions {
+	function normalize(value: string): string {
+		return value.replace(/[^\S\r\n]+/g, ' ').trim()
+	}
+
+	return {
+		...options,
+		input: normalize(options.input),
+		languageCode: normalize(options.languageCode ?? ''),
+		systemInstruction: normalize(options.systemInstruction ?? ''),
+	}
+}
+
 export async function getCacheKey(
 	options: GeminiSpeechOptions,
 ): Promise<string> {
-	const payload = JSON.stringify([
-		options.input,
-		options.model,
-		options.voice,
-		options.languageCode ?? '',
-		options.systemInstruction ?? '',
-	])
+	const payload = JSON.stringify(Object.values(normalizeSpeechOptions(options)))
 
 	const data = new TextEncoder().encode(payload)
 	const hash = await crypto.subtle.digest('SHA-256', data)
