@@ -1,6 +1,6 @@
 # @vdegenne/gemini-tts-proxy
 
-A lightweight HTTP proxy for Google's Gemini Text-to-Speech API.
+A lightweight HTTP proxy for Google's Gemini API.
 
 It exposes a simple HTTP endpoint to generate speech using Gemini voices and models, with built-in audio caching and optional authentication.
 
