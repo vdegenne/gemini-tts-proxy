@@ -7,7 +7,7 @@ import { Readable } from 'node:stream'
 import { GoogleGenAI } from '@google/genai'
 
 import { config } from './config.js'
-import { getAudioPath, getCacheKey, type GeminiSpeechOptions } from './core.js'
+import { getAudioPath, getCacheKey, type SpeechOptions } from './core.js'
 import { encodePcmToMp3 } from './ffmpeg.js'
 import { recordUsage } from './stats.js'
 
@@ -101,7 +101,7 @@ async function getDiskAudio(hash: string): Promise<CachedAudio | undefined> {
 }
 
 async function synthesize(
-	options: GeminiSpeechOptions,
+	options: SpeechOptions,
 	hash: string,
 	apiKey: string,
 ): Promise<void> {
@@ -278,7 +278,7 @@ async function synthesize(
 }
 
 export async function getSpeech(
-	options: GeminiSpeechOptions,
+	options: SpeechOptions,
 	apiKey: string,
 ): Promise<CachedAudio> {
 	const hash = await getCacheKey(options)

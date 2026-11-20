@@ -6,7 +6,7 @@ export const GEMINI_TTS_MODELS = [
 	'gemini-3.8-flash-lite-tts',
 ] as const
 
-export type GeminiTtsModel = (typeof GEMINI_TTS_MODELS)[number]
+export type Model = (typeof GEMINI_TTS_MODELS)[number]
 
 export const GEMINI_TTS_VOICES = [
 	'Achernar',
@@ -41,19 +41,17 @@ export const GEMINI_TTS_VOICES = [
 	'Zubenelgenubi',
 ] as const
 
-export type GeminiTtsVoice = (typeof GEMINI_TTS_VOICES)[number]
+export type Voice = (typeof GEMINI_TTS_VOICES)[number]
 
-export interface GeminiSpeechOptions {
+export interface SpeechOptions {
 	input: string
-	model: GeminiTtsModel
-	voice: GeminiTtsVoice
+	model: Model
+	voice: Voice
 	languageCode?: string
 	systemInstruction?: string
 }
 
-export function normalizeSpeechOptions(
-	options: GeminiSpeechOptions,
-): GeminiSpeechOptions {
+export function normalizeSpeechOptions(options: SpeechOptions): SpeechOptions {
 	function normalize(value: string): string {
 		return value.replace(/[^\S\r\n]+/g, ' ').trim()
 	}
@@ -66,9 +64,7 @@ export function normalizeSpeechOptions(
 	}
 }
 
-export async function getCacheKey(
-	options: GeminiSpeechOptions,
-): Promise<string> {
+export async function getCacheKey(options: SpeechOptions): Promise<string> {
 	const payload = JSON.stringify(Object.values(normalizeSpeechOptions(options)))
 
 	const data = new TextEncoder().encode(payload)

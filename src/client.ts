@@ -1,20 +1,16 @@
-import {
-	getCacheKey,
-	type GeminiSpeechOptions,
-	type GeminiTtsVoice,
-} from './core.js'
+import { getCacheKey, type SpeechOptions, type Voice } from './core.js'
 
-export interface GeminiAuthHeaders {
+export interface AuthHeaders {
 	Authorization?: `Bearer ${string}`
 	'x-goog-api-key'?: string
 }
 
-export interface GeminiFetchOptions {
-	headers?: Record<string, string> & GeminiAuthHeaders
+export interface FetchOptions {
+	headers?: Record<string, string> & AuthHeaders
 }
 
-export interface GeminiTtsVoiceInfo {
-	id: GeminiTtsVoice
+export interface VoiceInfo {
+	id: Voice
 	name: string
 }
 
@@ -28,7 +24,7 @@ type CachedAudio = Blob | Promise<Blob>
 export class GeminiTtsProxyClient {
 	endpoint: string
 
-	voices: GeminiTtsVoiceInfo[] = []
+	voices: VoiceInfo[] = []
 
 	private cache = new Map<string, CachedAudio>()
 
@@ -41,8 +37,8 @@ export class GeminiTtsProxyClient {
 	}
 
 	async getAudio(
-		options: GeminiSpeechOptions,
-		fetchOptions: GeminiFetchOptions = {},
+		options: SpeechOptions,
+		fetchOptions: FetchOptions = {},
 	): Promise<Blob> {
 		const key = await getCacheKey(options)
 
@@ -50,8 +46,8 @@ export class GeminiTtsProxyClient {
 	}
 
 	async createAudioRequest(
-		options: GeminiSpeechOptions,
-		fetchOptions: GeminiFetchOptions = {},
+		options: SpeechOptions,
+		fetchOptions: FetchOptions = {},
 	): Promise<AudioRequest> {
 		const key = await getCacheKey(options)
 
@@ -63,8 +59,8 @@ export class GeminiTtsProxyClient {
 
 	private async getCachedAudio(
 		key: string,
-		options: GeminiSpeechOptions,
-		fetchOptions: GeminiFetchOptions,
+		options: SpeechOptions,
+		fetchOptions: FetchOptions,
 	): Promise<Blob> {
 		const cached = this.cache.get(key)
 
@@ -89,8 +85,8 @@ export class GeminiTtsProxyClient {
 	}
 
 	protected async fetchAudio(
-		options: GeminiSpeechOptions,
-		fetchOptions: GeminiFetchOptions,
+		options: SpeechOptions,
+		fetchOptions: FetchOptions,
 	): Promise<Blob> {
 		const params = new URLSearchParams({
 			input: options.input,

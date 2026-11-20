@@ -14,8 +14,8 @@ import { config } from './config.js'
 import {
 	GEMINI_TTS_MODELS,
 	GEMINI_TTS_VOICES,
-	type GeminiTtsModel,
-	type GeminiTtsVoice,
+	type Model,
+	type Voice,
 } from './core.js'
 import { checkFFmpeg } from './ffmpeg.js'
 import { normalizeGeminiError } from './gemini-error.js'
@@ -106,7 +106,7 @@ app.get('/v1/audio/speech', async (c) => {
 		)
 	}
 
-	if (!GEMINI_TTS_MODELS.includes(model as GeminiTtsModel)) {
+	if (!GEMINI_TTS_MODELS.includes(model as Model)) {
 		return c.json(
 			{
 				error: `Unsupported model. Supported models: ${GEMINI_TTS_MODELS.join(', ')}`,
@@ -115,7 +115,7 @@ app.get('/v1/audio/speech', async (c) => {
 		)
 	}
 
-	if (!GEMINI_TTS_VOICES.includes(voice as GeminiTtsVoice)) {
+	if (!GEMINI_TTS_VOICES.includes(voice as Voice)) {
 		return c.json(
 			{
 				error: `Unsupported voice. Supported voices: ${GEMINI_TTS_VOICES.join(', ')}`,
@@ -177,8 +177,8 @@ app.get('/v1/audio/speech', async (c) => {
 		const audio = await getSpeech(
 			{
 				input,
-				model: model as GeminiTtsModel,
-				voice: voice as GeminiTtsVoice,
+				model: model as Model,
+				voice: voice as Voice,
 				...(languageCode ? { languageCode } : {}),
 				...(systemInstruction ? { systemInstruction } : {}),
 			},

@@ -1,6 +1,6 @@
 {
 	"name": "@vdegenne/gemini-tts-proxy",
-	"version": "0.1.31",
+	"version": "0.1.32",
 	"description": "A self-hosted Gemini proxy with caching and a browser client.",
 	"type": "module",
 	"repository": {
