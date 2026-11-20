@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 
-import { ApiError } from '@google/genai'
 import { type HttpBindings, serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
@@ -19,6 +18,7 @@ import {
 	type GeminiTtsVoice,
 } from './core.js'
 import { checkFFmpeg } from './ffmpeg.js'
+import { normalizeGeminiError } from './gemini-error.js'
 import { closeStats, getStatsSnapshot } from './stats.js'
 
 let ffmpegInfo: Awaited<ReturnType<typeof checkFFmpeg>>
@@ -32,48 +32,6 @@ try {
 		'Please install FFmpeg 4.4 or newer with libmp3lame support and make sure it is available in PATH.',
 	)
 	process.exit(1)
-}
-
-function getApiErrorMessage(error: ApiError): string {
-	try {
-		const response: unknown = JSON.parse(error.message)
-
-		if (
-			typeof response !== 'object' ||
-			response === null ||
-			!('error' in response) ||
-			typeof response.error !== 'object' ||
-			response.error === null ||
-			!('message' in response.error) ||
-			typeof response.error.message !== 'string'
-		) {
-			return error.message
-		}
-
-		const nestedMessage = response.error.message
-
-		try {
-			const googleError: unknown = JSON.parse(nestedMessage)
-
-			if (
-				typeof googleError === 'object' &&
-				googleError !== null &&
-				'error' in googleError &&
-				typeof googleError.error === 'object' &&
-				googleError.error !== null &&
-				'message' in googleError.error &&
-				typeof googleError.error.message === 'string'
-			) {
-				return googleError.error.message
-			}
-		} catch {
-			// The nested message is not JSON.
-		}
-
-		return nestedMessage
-	} catch {
-		return error.message
-	}
 }
 
 const app = new Hono<{ Bindings: HttpBindings }>()
@@ -240,22 +198,17 @@ app.get('/v1/audio/speech', async (c) => {
 			},
 		})
 	} catch (error) {
-		console.error(
-			'Speech synthesis failed:',
-			error instanceof ApiError ? getApiErrorMessage(error) : error,
+		const normalized = normalizeGeminiError(error)
+
+		console.error('Speech synthesis failed:', error)
+
+		return c.json(
+			{ error: normalized.message },
+			normalized.status as ContentfulStatusCode,
+			normalized.retryAfter
+				? { 'Retry-After': normalized.retryAfter }
+				: undefined,
 		)
-
-		if (error instanceof ApiError) {
-			const status =
-				error.status >= 400 && error.status <= 599 ? error.status : 502
-
-			return c.json(
-				{ error: getApiErrorMessage(error) },
-				status as ContentfulStatusCode,
-			)
-		}
-
-		return c.json({ error: 'Internal server error' }, 500)
 	}
 })
 
